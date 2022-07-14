@@ -1645,8 +1645,11 @@ function getCorner(
       // northeast destination, southwest source
       vertexIndex = cornerMesh.westIndicesSouthToNorth[0];
     }
-    getVertexFromTileAtCorner(cornerMesh, vertexIndex, u, v, vertex);
-    return vertex;
+    if (vertexIndex !== undefined) {
+      // if, eg. north west vertex is missing.
+      getVertexFromTileAtCorner(cornerMesh, vertexIndex, u, v, vertex);
+      return vertex;
+    }
   }
 
   // There is no precise vertex available from the corner or from either adjacent edge.
