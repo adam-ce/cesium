@@ -246,7 +246,11 @@ gulp.task("build-ts", function () {
 });
 
 gulp.task("buildApps", function () {
-  return Promise.join(buildCesiumViewer(), buildSandcastle());
+  return Promise.join(
+    buildCesiumViewer(),
+    buildSandcastle(),
+    buildAlpineMaps()
+  );
 });
 
 gulp.task("build-specs", function buildSpecs() {
@@ -1974,6 +1978,86 @@ function buildCesiumViewer() {
     );
 
     return streamToPromise(stream.pipe(gulp.dest(cesiumViewerOutputDirectory)));
+  });
+
+  return promise;
+}
+
+function buildAlpineMaps() {
+  const alpineMapsOutputDirectory = "Build/Apps/AlpineMaps";
+  mkdirp.sync(alpineMapsOutputDirectory);
+
+  let promise = Promise.join(
+    rollup
+      .rollup({
+        input: "Apps/AlpineMaps/AlpineMaps.js",
+        treeshake: {
+          moduleSideEffects: false,
+        },
+        plugins: [
+          rollupPluginStripPragma({
+            pragmas: ["debug"],
+          }),
+          rollupPluginTerser.terser(),
+        ],
+        onwarn: rollupWarning,
+      })
+      .then(function (bundle) {
+        return bundle.write({
+          file: "Build/Apps/AlpineMaps/AlpineMaps.js",
+          format: "iife",
+        });
+      })
+  );
+
+  promise = promise.then(function () {
+    const stream = mergeStream(
+      gulp
+        .src("Build/Apps/AlpineMaps/AlpineMaps.js")
+        .pipe(gulpInsert.prepend(copyrightHeader))
+        .pipe(gulpReplace("../../Source", "."))
+        .pipe(gulp.dest(alpineMapsOutputDirectory)),
+
+      gulp
+        .src("Apps/AlpineMaps/AlpineMaps.css")
+        .pipe(cleanCSS())
+        .pipe(gulpReplace("../../Source", "."))
+        .pipe(gulp.dest(alpineMapsOutputDirectory)),
+
+      gulp
+        .src("Apps/AlpineMaps/index.html")
+        .pipe(gulpReplace('type="module"', ""))
+        .pipe(gulp.dest(alpineMapsOutputDirectory)),
+
+      gulp.src([
+        "Apps/AlpineMaps/**",
+        "!Apps/AlpineMaps/index.html",
+        "!Apps/AlpineMaps/**/*.js",
+        "!Apps/AlpineMaps/**/*.css",
+      ]),
+
+      gulp.src(
+        [
+          "Build/Cesium/Assets/**",
+          "Build/Cesium/Workers/**",
+          "Build/Cesium/ThirdParty/**",
+          "Build/Cesium/Widgets/**",
+          "!Build/Cesium/Widgets/**/*.css",
+        ],
+        {
+          base: "Build/Cesium",
+          nodir: true,
+        }
+      ),
+
+      gulp.src(["Build/Cesium/Widgets/InfoBox/InfoBoxDescription.css"], {
+        base: "Build/Cesium",
+      }),
+
+      gulp.src(["web.config"])
+    );
+
+    return streamToPromise(stream.pipe(gulp.dest(alpineMapsOutputDirectory)));
   });
 
   return promise;
